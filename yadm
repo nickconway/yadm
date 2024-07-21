@@ -1929,6 +1929,12 @@ function parse_encrypt() {
   fi
   shopt -s globstar &> /dev/null
 
+  local unset_dotglob
+  if ! shopt dotglob &> /dev/null; then
+    unset_dotglob=1
+  fi
+  shopt -s dotglob &> /dev/null
+
   exclude_pattern="^!(.+)"
   # parse both included/excluded
   while IFS='' read -r line || [ -n "$line" ]; do
@@ -1971,6 +1977,10 @@ function parse_encrypt() {
 
   if [ "$unset_globstar" = "1" ]; then
     shopt -u globstar &> /dev/null
+  fi
+
+  if [ "$unset_dotglob" = "1" ]; then
+    shopt -u dotglob &> /dev/null
   fi
 
 }
