@@ -1917,6 +1917,12 @@ function parse_encrypt() {
     return
   fi
 
+  local unset_dotglob
+  if ! shopt dotglob &> /dev/null; then
+    unset_dotglob=1
+  fi
+  shopt -s dotglob &> /dev/null
+
   ENCRYPT_INCLUDE_FILES=()
 
   [ -f "$YADM_ENCRYPT" ] || return
@@ -1946,6 +1952,10 @@ function parse_encrypt() {
     while IFS= read -r filename; do
       ENCRYPT_INCLUDE_FILES+=("${filename%/}")
     done <<<"$("$GIT_PROGRAM" ls-files --others "${exclude[@]}" -- "${include[@]}")"
+  fi
+
+  if [ "$unset_dotglob" = "1" ]; then
+    shopt -u dotglob &> /dev/null
   fi
 }
 
