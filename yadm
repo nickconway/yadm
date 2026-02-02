@@ -41,6 +41,7 @@ YADM_ALT="alt"
 # these are the default paths relative to YADM_DATA
 YADM_REPO="repo.git"
 YADM_ARCHIVE="archive"
+YADM_USER_CONFIG=".user-config"
 
 HOOK_COMMAND=""
 FULL_COMMAND=""
@@ -101,7 +102,7 @@ function main() {
 
   # parse command line arguments
   local retval=0
-  internal_commands="^(alt|bootstrap|clean|clone|config|decrypt|encrypt|enter|git-crypt|help|--help|init|introspect|list|perms|transcrypt|upgrade|version|--version)$"
+  internal_commands="^(alt|bootstrap|clean|clone|config|decrypt|encrypt|enter|git-crypt|help|--help|init|introspect|list|perms|transcrypt|upgrade|user-config|version|--version)$"
   if [ -z "$*" ]; then
     # no argumnts will result in help()
     help
@@ -131,7 +132,7 @@ function main() {
           -f) # used by init(), clone() and upgrade()
             FORCE="YES"
             ;;
-          -l) # used by decrypt()
+          -l) # used by decrypt() and user_config()
             DO_LIST="YES"
             [[ "$YADM_COMMAND" =~ ^(clone|config)$ ]] && YADM_ARGS+=("$1")
             ;;
@@ -605,6 +606,11 @@ function alt() {
 
     score_file "$alt_source" "$alt_target"
   done
+
+  if [[ $1 == "LIST_TARGETS" ]]; then
+      printf '%s\n' "${alt_targets[@]}" | sed "s,^$YADM_WORK/,,g"
+      return
+  fi
 
   local alt_linked=()
 
@@ -1092,6 +1098,77 @@ function encrypt() {
 
   CHANGES_POSSIBLE=1
 
+}
+
+function user_config() {
+    local CURRENT_USER_CONFIG
+    CURRENT_USER_CONFIG="$(echo "$YADM_REPO" | sed "s,$YADM_DATA/,,g" | sed "s/.git//g")"
+
+    local USER_CONFIG="$*"
+    local TMP_FILE
+
+    local TAR_OPTION=''
+
+    if [[ $DEBUG == "YES" ]]; then
+      TAR_OPTION=v
+    fi
+
+    if [ "$DO_LIST" = "YES" ]; then
+        USER_CONFIGS=$(find "$YADM_DATA" -name '*.git')
+
+        if [[ $DEBUG == "YES" ]]; then
+          echo "$YADM_REPO *"
+          echo "$USER_CONFIGS" | grep -v "^$YADM_REPO$"
+        else
+          echo "$CURRENT_USER_CONFIG *"
+          echo "$USER_CONFIGS" | sed "s,$YADM_DATA/,,g" | sed "s/.git//g" | grep -v "^$CURRENT_USER_CONFIG$"
+        fi
+
+        return
+    fi
+
+    touch "$YADM_USER_CONFIG"
+
+    if [[ $# -eq 0 ]]; then
+        if [[ $DEBUG == "YES" ]]; then
+            echo "$YADM_REPO"
+            return
+        fi
+
+        echo "$CURRENT_USER_CONFIG"
+        return
+    elif [[ "$USER_CONFIG" == "$CURRENT_USER_CONFIG" ]]; then
+        echo "User config is already set to $CURRENT_USER_CONFIG"
+        return
+    fi
+
+    if [[ -e "$YADM_REPO" ]]; then
+        cd_work
+        echo "Saving current worktree from $YADM_REPO"
+
+        TMP_FILE="$(mktemp)"
+        (LIST_ENCRYPTED="YES" list && alt LIST_TARGETS) > "$TMP_FILE"
+
+        tar ${TAR_OPTION}czf "$YADM_REPO/archive" -T "$TMP_FILE"
+
+        while read -r f; do
+            rm "$f"
+            rmdir "$(dirname "$f")"
+        done < "$TMP_FILE" &>/dev/null
+
+        rm "$TMP_FILE"
+    fi
+
+    YADM_REPO="$YADM_DATA/$USER_CONFIG.git"
+
+    echo "$YADM_REPO" > "$YADM_USER_CONFIG"
+    echo "User config set to $USER_CONFIG"
+
+    [[ ! -e "$YADM_REPO/archive" ]] && return
+
+    cd_work
+    echo "Restoring worktree from $YADM_REPO"
+    tar ${TAR_OPTION}xzf "$YADM_REPO/archive" && rm "$YADM_REPO/archive"
 }
 
 function git_crypt() {
@@ -1775,8 +1852,12 @@ function configure_paths() {
   # change paths to be relative to YADM_DATA
   YADM_REPO="$YADM_DATA/$YADM_REPO"
   YADM_ARCHIVE="$YADM_DATA/$YADM_ARCHIVE"
+  YADM_USER_CONFIG="$YADM_DATA/$YADM_USER_CONFIG"
 
   # independent overrides for paths
+  if [[ -f "$YADM_USER_CONFIG" ]]; then
+    YADM_REPO="$(cat "$YADM_USER_CONFIG")"
+  fi
   if [ -n "$YADM_OVERRIDE_REPO" ]; then
     YADM_REPO="$YADM_OVERRIDE_REPO"
   fi
