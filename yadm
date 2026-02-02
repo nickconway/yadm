@@ -125,6 +125,9 @@ function main() {
           -d) # used by all commands
             DEBUG="YES"
             ;;
+          -e) # used by list()
+            LIST_ENCRYPTED="YES"
+            ;;
           -f) # used by init(), clone() and upgrade()
             FORCE="YES"
             ;;
@@ -1333,6 +1336,10 @@ function list() {
   # list tracked files
   "$GIT_PROGRAM" ls-files
 
+  if [ -n "$LIST_ENCRYPTED" ]; then
+    parse_encrypt
+    printf '%s\n' "${ENCRYPT_INCLUDE_FILES[@]}"
+  fi
 }
 
 function perms() {
