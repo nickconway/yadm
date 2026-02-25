@@ -1411,11 +1411,20 @@ function list() {
   fi
 
   # list tracked files
-  "$GIT_PROGRAM" ls-files
+
+  if [[ -z "$DEBUG" ]]; then
+    "$GIT_PROGRAM" ls-files
+  else
+    "$GIT_PROGRAM" ls-files | while read -r F; do echo "$YADM_WORK/$F"; done
+  fi
 
   if [ -n "$LIST_ENCRYPTED" ]; then
     parse_encrypt
-    printf '%s\n' "${ENCRYPT_INCLUDE_FILES[@]}"
+    if [[ -z "$DEBUG" ]]; then
+      printf '%s\n' "${ENCRYPT_INCLUDE_FILES[@]}"
+    else
+      printf "$YADM_WORK/%s\n" "${ENCRYPT_INCLUDE_FILES[@]}"
+    fi
   fi
 }
 
